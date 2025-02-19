@@ -1,222 +1,234 @@
-# GhostType-AI System Architecture
+# GhostType AI - System Architecture
 
 ## System Overview
 
 ```mermaid
-graph TB
-    subgraph Browser
-        subgraph "Chrome Extension"
-            background["Background Script<br/>(Service Worker)"]
-            content["Content Script<br/>(DOM Observer)"]
-            popup["Popup UI<br/>(Settings)"]
+graph TD
+    A[User Input] --> B[Input Detector]
+    B --> C[AI Service]
+    C --> D[Ghost Text UI]
+    D --> E[Tab Completion]
 
-            subgraph "Core Components"
-                detector["TextDetector<br/>(DOM Watcher)"]
-                ghost["GhostText<br/>(Svelte UI)"]
-                ai["Gemini Service<br/>(AI Integration)"]
-                store["Prediction Store<br/>(State Management)"]
-            end
-        end
-
-        webpage["Webpage<br/>(TextAreas)"]
-    end
-
-    subgraph "External Services"
-        gemini["Google Gemini AI<br/>(Text Completion)"]
-    end
-
-    %% Connections
-    webpage --> detector
-    detector --> ghost
-    detector --> ai
-    ai --> gemini
-    ai --> store
-    store --> ghost
-    popup --> store
-    background --> ai
-
-    %% Styling
-    classDef primary fill:#2563eb,stroke:#1e40af,color:white
-    classDef secondary fill:#4b5563,stroke:#374151,color:white
-    classDef external fill:#059669,stroke:#047857,color:white
-
-    class background,content,popup primary
-    class detector,ghost,ai,store secondary
-    class gemini external
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#bbf,stroke:#333,stroke-width:2px
+    style C fill:#dfd,stroke:#333,stroke-width:2px
+    style D fill:#fdd,stroke:#333,stroke-width:2px
+    style E fill:#dff,stroke:#333,stroke-width:2px
 ```
 
-## Component Data Flow
+## Component Architecture
+
+```mermaid
+graph LR
+    subgraph Content Script
+        A[Input Detector] --> B[Ghost Text]
+        B --> C[Position Engine]
+    end
+
+    subgraph AI Layer
+        D[Gemini Nano] --> E[Text Generation]
+        E --> F[Error Fallback]
+    end
+
+    subgraph UI Layer
+        G[React Portal] --> H[Shadow DOM]
+        H --> I[Style Sync]
+    end
+
+    Content Script --> AI Layer
+    AI Layer --> UI Layer
+```
+
+## Data Flow
 
 ```mermaid
 sequenceDiagram
-    participant TA as TextArea
-    participant TD as TextDetector
-    participant GS as GeminiService
-    participant PS as PredictionStore
-    participant GT as GhostText UI
+    participant User
+    participant Input
+    participant AI
+    participant UI
 
-    TA->>TD: Text Input Event
-    Note over TD: Debounce (300ms)
-    TD->>GS: Request Completion
-    GS->>PS: Update Loading State
-    GS-->>External: API Request
-    External-->>GS: AI Completion
-    GS->>PS: Store Prediction
-    PS->>GT: Update UI
-    GT->>TA: Display Ghost Text
+    User->>Input: Type text
+    Input->>AI: Request completion
+    AI-->>UI: Return suggestion
+    User->>Input: Press Tab
+    Input->>User: Accept completion
 ```
 
-## Directory Structure
-
-```mermaid
-graph TD
-    client["📦 client"]
-    src["📂 src"]
-    assets["📂 assets"]
-    components["📂 components"]
-    entrypoints["📂 entrypoints"]
-    lib["📂 lib"]
-
-    client --> src
-    src --> assets
-    src --> components
-    src --> entrypoints
-    src --> lib
-
-    %% Assets
-    assets --> global["📄 global.css"]
-
-    %% Components
-    components --> ghost["📄 GhostText.svelte"]
-    components --> detector["📄 TextDetector.svelte"]
-
-    %% Entrypoints
-    entrypoints --> popup["📂 popup"]
-    entrypoints --> background["📄 background.ts"]
-    entrypoints --> content["📄 content.ts"]
-    entrypoints --> inpage["📄 inpage.ts"]
-
-    %% Library
-    lib --> ai["📂 ai"]
-    lib --> dom["📂 dom"]
-    lib --> stores["📂 stores"]
-    lib --> utils["📂 utils"]
-
-    %% AI
-    ai --> gemini["📄 gemini-nano.ts"]
-    ai --> manager["📄 model-manager.ts"]
-
-    %% DOM
-    dom --> position["📄 position.ts"]
-    dom --> textdetect["📄 text-detector.ts"]
-
-    %% Stores
-    stores --> predictions["📄 predictions.ts"]
-
-    %% Utils
-    utils --> context["📄 context.ts"]
-    utils --> debounce["📄 debounce.ts"]
-
-    %% Styling
-    classDef folder fill:#e5e7eb,stroke:#d1d5db
-    classDef file fill:#f3f4f6,stroke:#e5e7eb
-
-    class client,src,assets,components,entrypoints,lib,popup,ai,dom,stores,utils folder
-    class global,ghost,detector,background,content,inpage,gemini,manager,position,textdetect,predictions,context,debounce file
-```
-
-## State Management Flow
+## State Machine
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Detecting: Page Load
-    Detecting --> Monitoring: Found TextArea
-    Monitoring --> Processing: Text Input
-    Processing --> Predicting: Debounced
-    Predicting --> Displaying: AI Response
-    Displaying --> Monitoring: User Continues
-    Monitoring --> Idle: TextArea Removed
-
-    state Predicting {
-        [*] --> Loading
-        Loading --> Success: Got Prediction
-        Loading --> Error: API Error
-        Success --> [*]
-        Error --> [*]
-    }
+    Idle --> Detecting: Focus Input
+    Detecting --> Processing: Text Change
+    Processing --> Displaying: AI Response
+    Displaying --> Idle: Tab/Escape
+    Displaying --> Processing: New Input
+    Processing --> Error: AI Failure
+    Error --> Idle: Reset
 ```
 
-## Technical Stack
+## Critical Paths
 
 ```mermaid
 graph TD
-    subgraph "Frontend"
-        svelte["<img src='https://upload.wikimedia.org/wikipedia/commons/1/1b/Svelte_Logo.svg' width='20' /> Svelte"]
-        ts["<img src='https://upload.wikimedia.org/wikipedia/commons/4/4c/Typescript_logo_2020.svg' width='20' /> TypeScript"]
-        css["<img src='https://upload.wikimedia.org/wikipedia/commons/d/d5/CSS3_logo_and_wordmark.svg' width='20' /> CSS3"]
-    end
+    A[Input Event] -->|300ms Debounce| B[Text Processing]
+    B -->|100ms Max| C[AI Request]
+    C -->|50ms Max| D[UI Update]
+    D -->|Instant| E[Ghost Text]
 
-    subgraph "Extension"
-        wxt["<img src='https://wxt.dev/logo.svg' width='20' /> WXT"]
-        mv3["<img src='https://upload.wikimedia.org/wikipedia/commons/e/e1/Google_Chrome_icon_%28February_2022%29.svg' width='20' /> Chrome MV3"]
-    end
-
-    subgraph "AI Integration"
-        gemini["<img src='https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg' width='20' /> Google Gemini"]
-        nano["🔬 Nano API"]
-    end
-
-    subgraph "Build Tools"
-        vite["<img src='https://vitejs.dev/logo.svg' width='20' /> Vite"]
-        pnpm["<img src='https://d33wubrfki0l68.cloudfront.net/aad219b6c931cebb53121dcda794f6180d9e4397/17f34/assets/images/pnpm-standard-79c9dbb2.svg' width='20' /> pnpm"]
-    end
-
-    %% Connections
-    svelte --> wxt
-    ts --> wxt
-    css --> wxt
-    wxt --> mv3
-    gemini --> nano
-    nano --> wxt
-    vite --> wxt
-    pnpm --> vite
-
-    %% Styling
-    classDef primary fill:#3b82f6,stroke:#2563eb,color:white
-    classDef secondary fill:#6b7280,stroke:#4b5563,color:white
-
-    class svelte,ts,css,wxt,mv3 primary
-    class gemini,nano,vite,pnpm secondary
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#bbf,stroke:#333,stroke-width:2px
+    style C fill:#dfd,stroke:#333,stroke-width:2px
+    style D fill:#fdd,stroke:#333,stroke-width:2px
+    style E fill:#dff,stroke:#333,stroke-width:2px
 ```
 
-## Performance Monitoring Points
+## Performance Targets
 
 ```mermaid
 graph LR
-    subgraph "Metrics"
-        detection["Text Detection<br/>Target: <50ms"]
-        prediction["AI Prediction<br/>Target: <500ms"]
-        memory["Memory Usage<br/>Target: <50MB"]
-        coverage["TextArea Coverage<br/>Target: 95%"]
+    subgraph Latency Budgets
+        A[Input: 50ms] --> B[AI: 150ms]
+        B --> C[Render: 50ms]
     end
 
-    subgraph "Monitoring Tools"
-        performance["Chrome<br/>Performance Panel"]
-        console["Console<br/>Timestamps"]
-        profiler["Memory<br/>Profiler"]
-        matrix["Test Matrix"]
+    subgraph Resource Limits
+        D[Memory: 50MB] --> E[CPU: 1%]
+        E --> F[Storage: 10MB]
     end
-
-    detection --> performance
-    prediction --> console
-    memory --> profiler
-    coverage --> matrix
-
-    %% Styling
-    classDef metric fill:#10b981,stroke:#059669,color:white
-    classDef tool fill:#6366f1,stroke:#4f46e5,color:white
-
-    class detection,prediction,memory,coverage metric
-    class performance,console,profiler,matrix tool
 ```
+
+## Error Handling
+
+```mermaid
+flowchart TD
+    A[Error Detected] --> B{Error Type}
+    B -->|AI Unavailable| C[Cloud Fallback]
+    B -->|Network Error| D[Local Cache]
+    B -->|Position Error| E[Force Recalc]
+    C --> F[Resume]
+    D --> F
+    E --> F
+```
+
+## MVP Scope
+
+```mermaid
+pie
+    title Feature Priority
+    "Input Detection" : 30
+    "AI Integration" : 25
+    "Ghost Text UI" : 20
+    "Tab Completion" : 15
+    "Error Handling" : 10
+```
+
+## Core Components
+
+### 1. Content Script Layer (Essential)
+
+```typescript
+interface InputDetector {
+  activeElement: HTMLElement | null;
+  inputSelectors: string[];
+
+  initialize(): void;
+  cleanup(): void;
+  handleInputChange(element: HTMLElement): void;
+}
+```
+
+Key MVP features:
+
+- Basic DOM monitoring for text inputs
+- Input element detection
+- Cursor position tracking
+
+### 2. UI Layer (Minimal)
+
+```typescript
+interface GhostTextProps {
+  suggestion: string;
+  position: {
+    top: number;
+    left: number;
+  };
+  style: {
+    font: string;
+    color: string;
+  };
+}
+```
+
+MVP features:
+
+- Basic text overlay positioning
+- Font matching
+- Simple portal-based rendering
+
+### 3. AI Integration (Core)
+
+```typescript
+interface AIService {
+  model: "gemini-nano";
+  generateCompletion(context: string): Promise<string>;
+}
+```
+
+MVP features:
+
+- Basic Gemini Nano integration
+- Simple text completion
+- Error fallback to cloud API
+
+## Performance (MVP Focus)
+
+### 1. Basic Debouncing
+
+```typescript
+const debouncedUpdate = debounce((text: string) => {
+  requestCompletion(text);
+}, 300);
+```
+
+### 2. Simple Context
+
+```typescript
+const getContext = (element: HTMLElement): string => {
+  const text = element.value || element.textContent;
+  const cursorPos = getCursorPosition(element);
+  return text.substring(Math.max(0, cursorPos - 100), cursorPos);
+};
+```
+
+## MVP Browser Support
+
+- Chrome only (initial release)
+- Basic textarea and input[type="text"] support
+- Simple undo/redo via browser native support
+
+## Security (Essential Only)
+
+- Input sanitization
+- Basic CSP compliance
+- Local processing preference
+
+## Error Handling (MVP)
+
+```typescript
+const handleError = async (error: Error) => {
+  console.error(error);
+  fallbackToCloud();
+};
+```
+
+## Future Considerations (Post-MVP)
+
+- Cross-browser support
+- Advanced text positioning
+- Caching system
+- Plugin system
+- Custom models
+- Advanced UI components with shadcn/ui
