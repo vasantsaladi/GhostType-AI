@@ -1,201 +1,156 @@
-# GhostType AI - 24-Hour Build Plan
+# 24-Hour MVP Implementation Roadmap
 
-## Hour-by-Hour Implementation Guide
+## 1. Core Architecture (3 hours)
 
-### Hours 0-2: Project Setup
+**Tech Stack:**
+
+- **WXT Framework** (Faster than Vite+React)
+- **TypeScript** (Existing Codebase)
+- **Shadow DOM** for UI isolation
+- **Chrome MV3** (No React DevTools Needed)
 
 ```bash
-# Install core tools
-npm install -g wxt typescript
-
 # Initialize project
-npm create wxt@latest -- -t react-ts
-
-# Install minimal dependencies
-npm install @radix-ui/react-slot clsx tailwind-merge lodash.debounce @types/chrome
+npx wxt@latest init --template react-ts
 ```
 
-### Hours 2-4: Input Detection System
+## 2. Essential Text Field Handling (4 hours)
+
+**Key Improvements:**
+
+- Combined MutationObserver + Event Delegation
+- Supports ContentEditable + Shadow DOM inputs
 
 ```typescript
-// src/content.ts
-const INPUT_SELECTORS = [
-  "textarea",
-  'input[type="text"]',
-  'div[contenteditable="true"]',
-];
+// content.ts
+const observer = new MutationObserver((mutations) => {
+  document
+    .querySelectorAll('input, textarea, [contenteditable="true"]')
+    .forEach(attachHandler);
+});
 
-const trackActiveInput = (): HTMLElement | null => {
-  const activeEl = document.activeElement as HTMLElement;
-  return INPUT_SELECTORS.some((selector) => activeEl?.matches(selector))
-    ? activeEl
-    : null;
-};
-
-// Simple mutation observer setup
-new MutationObserver(() => {
-  const input = trackActiveInput();
-  if (input) handleInputDetected(input);
-}).observe(document.body, { subtree: true, childList: true });
+observer.observe(document, {
+  subtree: true,
+  childList: true,
+  attributes: true,
+});
 ```
 
-### Hours 4-8: Ghost Text Component
+## 3. Gemini Nano Integration (4 hours)
 
-```tsx
-// src/components/GhostText.tsx
-const GhostText = ({ suggestion, target }: Props) => {
-  const [position, setPosition] = useState(target.getBoundingClientRect());
+**Optimizations:**
 
-  useLayoutEffect(() => {
-    const updatePosition = () => setPosition(target.getBoundingClientRect());
-    const observer = new ResizeObserver(updatePosition);
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [target]);
-
-  return createPortal(
-    <div
-      style={{
-        position: "absolute",
-        top: position.top,
-        left: position.left,
-        opacity: 0.6,
-        pointerEvents: "none",
-        font: window.getComputedStyle(target).font,
-      }}
-    >
-      {suggestion}
-    </div>,
-    document.body
-  );
-};
-```
-
-### Hours 8-12: Gemini Nano Integration
+- Direct `window.ai` API access
+- Model pre-loading during idle
 
 ```typescript
-// src/services/ai.ts
-const getCompletion = async (context: string): Promise<string> => {
-  try {
-    if (!window.ai?.languageModel) {
-      throw new Error("Gemini Nano not available");
-    }
+// background.ts
+let aiSession: AISession;
 
-    const session = await window.ai.languageModel.createSession();
-    return session.prompt(context.slice(-500));
-  } catch (error) {
-    console.error("AI Error:", error);
-    return ""; // Silent fail for MVP
+chrome.runtime.onStartup.addListener(async () => {
+  aiSession = await window.ai.createTextSession({
+    model: "gemini-nano",
+    quantization: "int4",
+  });
+});
+
+chrome.runtime.onMessage.addListener((req, _, res) => {
+  aiSession.prompt(req.text.slice(-200)).then((completion) => res(completion));
+  return true;
+});
+```
+
+## 4. Zero-Latency UI (3 hours)
+
+**Critical Features:**
+
+- CSS Font Matching Algorithm
+- Position Synchronization System
+
+```typescript
+// overlay.ts
+function syncStyles(source: Element, overlay: HTMLElement) {
+  const style = getComputedStyle(source);
+  overlay.style.cssText = `
+    font: ${style.font};
+    letter-spacing: ${style.letterSpacing};
+    line-height: ${style.lineHeight};
+    z-index: 2147483647;
+  `;
+}
+```
+
+## 5. Edge Case Handling (4 hours)
+
+**Solutions:**
+
+- **Undo/Redo:** Document.execCommand()
+- **Scrolling:** IntersectionObserver + ResizeObserver
+- **Mobile:** Virtual Keyboard Detection
+
+```typescript
+// undo-manager.ts
+let lastValue = "";
+const observer = new MutationObserver(() => {
+  if (target.value !== lastValue) {
+    undoStack.push(lastValue);
+    lastValue = target.value;
   }
-};
-
-// Debounced wrapper
-export const useDebouncedAI = (delay = 300) => {
-  return useCallback(
-    debounce(async (text: string) => getCompletion(text), delay),
-    []
-  );
-};
+});
 ```
 
-### Hours 12-16: Tab Completion Handler
+## 6. Performance Optimization (3 hours)
+
+**Techniques:**
+
+- Debounced Predictions (300ms)
+- Prediction Cache (LRU Strategy)
+- WebAssembly Accelerated Tokenization
 
 ```typescript
-// src/handlers/completion.ts
-const handleTabCompletion = (e: KeyboardEvent, suggestion: string) => {
-  if (e.key === "Tab" && suggestion) {
-    e.preventDefault();
-    const input = e.target as HTMLElement;
-    document.execCommand("insertText", false, suggestion);
+const predictionCache = new Map<string, string>();
+
+function getCachedCompletion(text: string) {
+  if (predictionCache.has(text)) {
+    return predictionCache.get(text);
   }
-};
-
-export const useTabCompletion = (suggestion: string) => {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => handleTabCompletion(e, suggestion);
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [suggestion]);
-};
+  // ...
+}
 ```
 
-### Hours 16-20: Main Integration
+## 7. Cross-Site Testing (3 hours)
 
-```tsx
-// src/Content.tsx
-const Content = () => {
-  const [input, setInput] = useState<HTMLElement | null>(null);
-  const [suggestion, setSuggestion] = useState("");
-  const getAICompletion = useDebouncedAI();
+**Validation Matrix:**
 
-  useEffect(() => {
-    const checkInput = () => {
-      const detected = trackActiveInput();
-      if (detected !== input) {
-        setInput(detected);
-      }
-    };
+| Site Type       | Test Cases            |
+| :-------------- | :-------------------- |
+| CMS (WordPress) | TinyMCE, Gutenberg    |
+| SPAs (React)    | Controlled Components |
+| Email Clients   | Gmail, Outlook        |
 
-    const interval = setInterval(checkInput, 500);
-    return () => clearInterval(interval);
-  }, [input]);
+## 8. Demo Preparation (Final 3 hours)
 
-  useEffect(() => {
-    if (input) {
-      const text = input.value || input.textContent || "";
-      getAICompletion(text).then(setSuggestion);
-    }
-  }, [input, getAICompletion]);
+**Key Demo Points:**
 
-  useTabCompletion(suggestion);
+1. Live Typing in Google Docs
+2. Form Field Completion (React Hook Form)
+3. Undo/Redo Showcase
+4. Cross-site Consistency
 
-  return input && suggestion ? (
-    <GhostText suggestion={suggestion} target={input} />
-  ) : null;
-};
+**Critical Path Visualization:**
+
+```
+[Typing] → [Debounce] → [AI Call] → [Cache Check] → [UI Render]
+           (300ms)      (150-200ms)   (0-50ms)      (16ms)
 ```
 
-### Hours 20-24: Testing & Performance
+This plan leverages the most efficient patterns from search results while maintaining your existing TypeScript/WXT foundation. The focused approach eliminates non-essential features while implementing robust text handling through:
 
-```typescript
-// Critical test cases
-const testCases = [
-  "Gmail Compose",
-  "Google Docs",
-  "Twitter",
-  "Basic Textarea",
-  "Dynamic Inputs",
-];
+1. **MutationObserver** + **Event Delegation** hybrid monitoring
+2. **Font Synchronization** through computed style analysis
+3. **Prediction Cache** with LRU expiration
+4. **Cross-frame** support via Shadow DOM isolation
 
-// Performance metrics
-const metrics = {
-  inputLatency: "< 50ms",
-  aiResponse: "< 150ms",
-  renderTime: "< 50ms",
-  memoryUsage: "< 50MB",
-};
-```
+Total Implementation Time: 24 hours
 
-## Emergency Fallbacks
-
-1. Font matching issues: Use system default
-2. Position sync issues: Force recalc on scroll
-3. AI unavailable: Show loading state
-
-## Final Build & Deploy
-
-```bash
-# Production build
-npm run build
-
-# Package extension
-cd dist && zip -r ../ghosttype.zip .
-```
-
-## Success Criteria
-
-- [x] Works on Chrome latest
-- [x] < 200ms total latency
-- [x] Basic completion working
-- [x] Tab to accept
-- [x] Graceful error handling
+<div style="text-align: center">⁂</div>
