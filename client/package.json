@@ -1,8 +1,8 @@
 {
-  "name": "wxt-react-starter",
-  "description": "manifest.json description",
+  "name": "ghosttype-ai",
+  "description": "Enhance your emails with Claude AI",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -15,15 +15,17 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "@anthropic-ai/sdk": "^0.36.3",
+    "@inboxsdk/core": "^2.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.280",
-    "@types/react": "^19.0.1",
-    "@types/react-dom": "^19.0.2",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
     "@wxt-dev/module-react": "^1.1.2",
-    "typescript": "^5.6.3",
-    "wxt": "^0.19.13"
+    "typescript": "^5.3.3",
+    "wxt": "^0.19.27"
   }
 }
