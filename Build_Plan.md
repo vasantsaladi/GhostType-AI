@@ -11,7 +11,8 @@
 
 ```bash
 # Initialize project
-npx wxt@latest init --template react-ts
+pnpm dlx wxt@latest init
+#react->ts->pnpm
 ```
 
 ## 2. Essential Text Field Handling (4 hours)

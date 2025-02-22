@@ -28,7 +28,8 @@
     return fetchOpts;
   }
   function processPreload(link) {
-    if (link.ep) return;
+    if (link.ep)
+      return;
     link.ep = true;
     const fetchOpts = getFetchOpts(link);
     fetch(link.href, fetchOpts);
@@ -46,7 +47,7 @@ const logger = {
   debug: (...args) => print(console.debug, ...args),
   log: (...args) => print(console.log, ...args),
   warn: (...args) => print(console.warn, ...args),
-  error: (...args) => print(console.error, ...args),
+  error: (...args) => print(console.error, ...args)
 };
 let ws;
 function getDevServerWebSocket() {
@@ -55,10 +56,7 @@ function getDevServerWebSocket() {
     logger.debug("Connecting to dev server @", serverUrl);
     ws = new WebSocket(serverUrl, "vite-hmr");
     ws.addWxtEventListener = ws.addEventListener.bind(ws);
-    ws.sendCustom = (event, payload) =>
-      ws == null
-        ? void 0
-        : ws.send(JSON.stringify({ type: "custom", event, payload }));
+    ws.sendCustom = (event, payload) => ws == null ? void 0 : ws.send(JSON.stringify({ type: "custom", event, payload }));
     ws.addEventListener("open", () => {
       logger.debug("Connected to dev server");
     });
@@ -72,11 +70,9 @@ function getDevServerWebSocket() {
       try {
         const message = JSON.parse(e.data);
         if (message.type === "custom") {
-          ws == null
-            ? void 0
-            : ws.dispatchEvent(
-                new CustomEvent(message.event, { detail: message.data })
-              );
+          ws == null ? void 0 : ws.dispatchEvent(
+            new CustomEvent(message.event, { detail: message.data })
+          );
         }
       } catch (err) {
         logger.error("Failed to handle message", err);
@@ -89,7 +85,8 @@ function getDevServerWebSocket() {
   try {
     const ws2 = getDevServerWebSocket();
     ws2.addWxtEventListener("wxt:reload-page", (event) => {
-      if (event.detail === location.pathname.substring(1)) location.reload();
+      if (event.detail === location.pathname.substring(1))
+        location.reload();
     });
   } catch (err) {
     logger.error("Failed to setup web socket connection with dev server", err);
