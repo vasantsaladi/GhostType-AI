@@ -76,17 +76,18 @@ export async function generatePrediction(text: string): Promise<string> {
           {
             role: "system",
             content:
-              "You are a helpful text prediction assistant. Complete the user's text naturally and concisely.",
+              "You are a natural text predictor. Continue the user's text naturally, fixing any typos in their input if needed. Keep suggestions brief (2-3 words) and conversational. Never use quotation marks.",
           },
           {
             role: "user",
-            content: `Complete this text naturally: "${text}"`,
+            content: `Continue this text naturally and fix any typos (2-3 words max): ${text}`,
           },
         ],
         temperature: 0.4,
-        max_tokens: 50,
+        max_tokens: 10,
         presence_penalty: 0.1,
         frequency_penalty: 0.1,
+        top_p: 0.9,
       }),
     });
 
@@ -95,15 +96,59 @@ export async function generatePrediction(text: string): Promise<string> {
     }
 
     const data = await response.json();
-    const prediction = data.choices[0].message.content.trim();
+    let prediction = data.choices[0].message.content.trim();
 
-    // Only return the prediction if it's a natural continuation
-    if (prediction.toLowerCase().startsWith(text.toLowerCase())) {
+    // Remove any quotation marks
+    prediction = prediction.replace(/['"]/g, "");
+
+    // If the prediction starts with the input text (ignoring case and minor typos),
+    // only return the new part
+    const inputWords = text.toLowerCase().split(/\s+/);
+    const predWords = prediction.toLowerCase().split(/\s+/);
+
+    if (predWords.length > inputWords.length) {
+      // Check if prediction includes corrected version of input
+      const correctedInput = predWords.slice(0, inputWords.length).join(" ");
+      const newWords = predWords.slice(inputWords.length).join(" ");
+
+      // If the correction is very similar to input, use original input
+      if (stringSimilarity(text.toLowerCase(), correctedInput) > 0.8) {
+        return text + " " + newWords;
+      }
+      // Otherwise return the full correction
       return prediction;
     }
-    return text + prediction;
+
+    return prediction;
   } catch (error) {
     console.error("Error generating prediction:", error);
     return "";
   }
+}
+
+// Helper function to check string similarity
+function stringSimilarity(str1: string, str2: string): number {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+    for (let j = 1; j <= len2; j++) {
+      if (i === 0) {
+        matrix[i][j] = j;
+      } else {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost
+        );
+      }
+    }
+  }
+
+  const maxLen = Math.max(len1, len2);
+  const similarity = 1 - matrix[len1][len2] / maxLen;
+  return similarity;
 }
