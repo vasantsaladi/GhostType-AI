@@ -9,10 +9,10 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
 };
 
 // API Keys and Configuration
-export const CLAUDE_API_KEY = getEnvVar("CLAUDE_API_KEY");
-if (!CLAUDE_API_KEY) {
+export const OPENAI_API_KEY = getEnvVar("OPENAI_API_KEY");
+if (!OPENAI_API_KEY) {
   throw new Error(
-    "CLAUDE_API_KEY is required. Please add it to your .env file."
+    "OPENAI_API_KEY is required. Please add it to your .env file."
   );
 }
 

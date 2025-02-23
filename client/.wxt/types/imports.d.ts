@@ -17,6 +17,8 @@ declare global {
   const defineWxtPlugin: typeof import('wxt/sandbox')['defineWxtPlugin']
   const fakeBrowser: typeof import('wxt/testing')['fakeBrowser']
   const injectScript: typeof import('wxt/client')['injectScript']
+  const isSensitiveField: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/utils/security')['isSensitiveField']
+  const mountEnhanceModal: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/components/EnhanceModal')['mountEnhanceModal']
   const storage: typeof import('wxt/storage')['storage']
   const useAppConfig: typeof import('wxt/client')['useAppConfig']
 }
