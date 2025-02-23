@@ -83,8 +83,7 @@ export class GhostTextManager {
     const input = event.target as HTMLElement;
     this.currentInput = this.findEditableParent(input);
     const text = this.getInputText(this.currentInput);
-    const words = text.trim().split(/\s+/);
-    if (text && words.length >= 2) {
+    if (text && text.length >= 3) {
       this.handleInput(event);
     }
   };
@@ -119,10 +118,16 @@ export class GhostTextManager {
     if (!editableElement) return;
 
     const text = this.getInputText(editableElement);
-    const words = text.trim().split(/\s+/);
 
-    // Only show predictions after 2 words
-    if (!text || words.length < 2) {
+    // Quick length check first (faster than splitting)
+    if (!text || text.length < 3) {
+      this.hideGhostText();
+      return;
+    }
+
+    // Only proceed with word check if we have enough characters
+    const words = text.trim().split(/\s+/);
+    if (words.length < 1) {
       this.hideGhostText();
       return;
     }
@@ -138,7 +143,7 @@ export class GhostTextManager {
       console.error("Error getting prediction:", error);
       this.hideGhostText();
     }
-  }, 100); // Reduced debounce time for faster response
+  }, 50); // Ultra-fast debounce
 
   private getInputText(element: Element | null): string {
     if (!element) return "";
@@ -175,8 +180,16 @@ export class GhostTextManager {
 
   private async getPrediction(text: string): Promise<string> {
     const cacheKey = text.toLowerCase();
+
+    // Check cache first
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey)!;
+    }
+
+    // Maintain cache size
+    if (this.cache.size > 100) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
     }
 
     const prediction = await generatePrediction(text);
@@ -194,66 +207,53 @@ export class GhostTextManager {
     const computedStyle = window.getComputedStyle(element as HTMLElement);
     const currentText = this.getInputText(element);
 
-    // Check if prediction includes corrections to current text
+    // Fast string operations
     const currentWords = currentText.toLowerCase().split(/\s+/);
     const predictionWords = prediction.toLowerCase().split(/\s+/);
 
-    let ghostText = "";
-    let xOffset = 0;
-    let yOffset = 0;
-
-    // Get the current cursor position
-    const selection = window.getSelection();
-    if (!selection) return;
-
-    // Only show continuations, not corrections
-    if (predictionWords.length > currentWords.length) {
-      // Prediction continues the text, limit to 10 new words
-      const continuationWords = predictionWords
-        .slice(currentWords.length)
-        .slice(0, 10);
-      ghostText = " " + continuationWords.join(" ");
-
-      // Calculate text width for positioning
-      const textMetrics = this.measureText(currentText, element as HTMLElement);
-      xOffset = Math.min(textMetrics.width, elementWidth - 50);
-
-      // Check if we need to wrap to next line
-      if (
-        xOffset + this.measureText(ghostText, element as HTMLElement).width >
-        elementWidth - 20
-      ) {
-        xOffset = 0;
-        yOffset = parseFloat(computedStyle.lineHeight || "0");
-      }
-    }
-
-    if (!ghostText) {
+    // Quick length comparison before proceeding
+    if (predictionWords.length <= currentWords.length) {
       this.hideGhostText();
       return;
     }
 
-    // Position the ghost text
-    this.ghostElement.style.cssText = `
-      position: absolute;
-      pointer-events: none;
-      color: #666;
-      opacity: 0.6;
-      font-family: ${computedStyle.fontFamily};
-      font-size: ${computedStyle.fontSize};
-      line-height: ${computedStyle.lineHeight};
-      white-space: pre;
-      z-index: 999999;
-      display: block;
-      background: transparent;
-      padding: ${computedStyle.padding};
-      margin: ${computedStyle.margin};
-      left: ${rect.left + window.scrollX + xOffset}px;
-      top: ${rect.top + window.scrollY + yOffset}px;
-      max-width: ${elementWidth - xOffset}px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    `;
+    // Get continuation words (up to 10)
+    const continuationWords = predictionWords.slice(
+      currentWords.length,
+      currentWords.length + 10
+    );
+    const ghostText = " " + continuationWords.join(" ");
+
+    // Simplified positioning calculation
+    const textMetrics = this.measureText(currentText, element as HTMLElement);
+    let xOffset = Math.min(textMetrics.width, elementWidth - 50);
+    let yOffset = 0;
+
+    // Simple overflow check
+    if (xOffset > elementWidth - 100) {
+      xOffset = 0;
+      yOffset = parseFloat(computedStyle.lineHeight || "0");
+    }
+
+    // Set styles directly for better performance
+    this.ghostElement.style.position = "absolute";
+    this.ghostElement.style.pointerEvents = "none";
+    this.ghostElement.style.color = "#666";
+    this.ghostElement.style.opacity = "0.6";
+    this.ghostElement.style.fontFamily = computedStyle.fontFamily;
+    this.ghostElement.style.fontSize = computedStyle.fontSize;
+    this.ghostElement.style.lineHeight = computedStyle.lineHeight;
+    this.ghostElement.style.whiteSpace = "pre";
+    this.ghostElement.style.zIndex = "999999";
+    this.ghostElement.style.display = "block";
+    this.ghostElement.style.background = "transparent";
+    this.ghostElement.style.padding = computedStyle.padding;
+    this.ghostElement.style.margin = computedStyle.margin;
+    this.ghostElement.style.left = `${rect.left + window.scrollX + xOffset}px`;
+    this.ghostElement.style.top = `${rect.top + window.scrollY + yOffset}px`;
+    this.ghostElement.style.maxWidth = `${elementWidth - xOffset}px`;
+    this.ghostElement.style.overflow = "hidden";
+    this.ghostElement.style.textOverflow = "ellipsis";
 
     this.ghostElement.textContent = ghostText;
     this.currentInput = element;
@@ -261,15 +261,22 @@ export class GhostTextManager {
   }
 
   private measureText(text: string, element: HTMLElement): { width: number } {
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    if (!context) return { width: 0 };
+    // Cache the canvas context for better performance
+    if (!this._cachedContext) {
+      const canvas = document.createElement("canvas");
+      this._cachedContext = canvas.getContext("2d");
+    }
+
+    if (!this._cachedContext) return { width: 0 };
 
     const computedStyle = window.getComputedStyle(element);
-    context.font = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+    this._cachedContext.font = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
 
-    return context.measureText(text);
+    return this._cachedContext.measureText(text);
   }
+
+  // Add canvas context cache
+  private _cachedContext: CanvasRenderingContext2D | null = null;
 
   private hideGhostText = () => {
     if (this.ghostElement) {
