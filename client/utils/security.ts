@@ -1,3 +1,6 @@
+import * as JSONBigInt from "json-bigint";
+
+// Enhanced security patterns
 const SENSITIVE_PATTERNS = [
   /password/i,
   /passwd/i,
@@ -12,6 +15,39 @@ const SENSITIVE_PATTERNS = [
   /pin/i,
   /cvv/i,
 ];
+
+// Safe fetch wrapper with timeout and error handling
+export const safeFetch = async (
+  url: string,
+  options?: RequestInit
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.error("Fetch error:", error);
+    throw new Error(
+      `Request failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 export function isSensitiveField(element: HTMLElement): boolean {
   const attributes = [

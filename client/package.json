@@ -1,6 +1,6 @@
 {
   "name": "ghosttype-ai",
-  "description": "Enhance your writing with GPT-4",
+  "description": "Enhance your writing with AI",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -15,12 +15,11 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "@inboxsdk/core": "^2.1.1",
     "@types/lodash": "^4.17.15",
     "lodash": "^4.17.21",
-    "openai": "^4.85.4",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "json-bigint": "^1.0.0"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.280",

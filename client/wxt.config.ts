@@ -5,18 +5,12 @@ import * as dotenv from "dotenv";
 // Load environment variables
 const env = dotenv.config().parsed;
 
-// Debug log for build process
-console.log("Environment loaded:", {
-  OPENAI_KEY_EXISTS: !!env?.OPENAI_API_KEY,
-  ENV_CONTENTS: env,
-});
-
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   manifest: {
     name: "GhostType AI",
     description: "Enhance your writing with AI",
-    permissions: ["activeTab", "scripting", "contextMenus"],
+    permissions: ["activeTab", "scripting", "contextMenus", "storage"],
     host_permissions: ["<all_urls>", "https://api.openai.com/*"],
     web_accessible_resources: [
       {

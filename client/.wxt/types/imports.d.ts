@@ -5,6 +5,8 @@ declare global {
   const InvalidMatchPattern: typeof import('wxt/sandbox')['InvalidMatchPattern']
   const MatchPattern: typeof import('wxt/sandbox')['MatchPattern']
   const MigrationError: typeof import('wxt/storage')['MigrationError']
+  const MultiModelChat: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/components/MultiModelChat')['MultiModelChat']
+  const Sidebar: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/components/Sidebar')['Sidebar']
   const browser: typeof import('wxt/browser')['browser']
   const createIframeUi: typeof import('wxt/client')['createIframeUi']
   const createIntegratedUi: typeof import('wxt/client')['createIntegratedUi']
@@ -19,6 +21,9 @@ declare global {
   const injectScript: typeof import('wxt/client')['injectScript']
   const isSensitiveField: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/utils/security')['isSensitiveField']
   const mountEnhanceModal: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/components/EnhanceModal')['mountEnhanceModal']
+  const mountMultiModelChat: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/components/MultiModelChat')['mountMultiModelChat']
+  const mountSidebar: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/components/Sidebar')['mountSidebar']
+  const safeFetch: typeof import('/Users/vasantsaladi/Documents/GitHub/GhostType-AI/client/utils/security')['safeFetch']
   const storage: typeof import('wxt/storage')['storage']
   const useAppConfig: typeof import('wxt/client')['useAppConfig']
 }
