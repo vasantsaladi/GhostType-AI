@@ -9,13 +9,15 @@ export default function App() {
   }, []);
 
   const openSidebar = async () => {
-    console.log("openSidebar called in popup");
+    console.log("openSidebar called");
     try {
-      const [tab] = await chrome.tabs.query({
+      const tabs = await chrome.tabs.query({
         active: true,
         currentWindow: true,
       });
+      const tab = tabs[0];
       console.log("Active tab:", tab);
+
       if (tab.id) {
         console.log("Sending toggleSidebar message to tab:", tab.id);
 
@@ -24,7 +26,7 @@ export default function App() {
           tab.id,
           { action: "toggleSidebar" },
           (response) => {
-            console.log("Received response from content script:", response);
+            console.log("Response from content script:", response);
             if (chrome.runtime.lastError) {
               console.error("Error sending message:", chrome.runtime.lastError);
 
@@ -51,13 +53,28 @@ export default function App() {
   };
 
   const openMultiModelChat = async () => {
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    if (tab.id) {
-      chrome.tabs.sendMessage(tab.id, { action: "toggleMultiModelChat" });
-      window.close();
+    console.log("openMultiModelChat called");
+    try {
+      const tabs = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      const tab = tabs[0];
+
+      if (tab.id) {
+        chrome.tabs.sendMessage(
+          tab.id,
+          { action: "toggleMultiModelChat" },
+          (response) => {
+            console.log("Response from content script:", response);
+            window.close();
+          }
+        );
+      } else {
+        console.error("No tab ID available");
+      }
+    } catch (error) {
+      console.error("Error in openMultiModelChat:", error);
     }
   };
 
@@ -67,72 +84,94 @@ export default function App() {
   };
 
   return (
-    <div className="w-64 p-4 bg-white">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-bold text-gray-800">GhostType AI</h1>
-        <button
-          onClick={openOptions}
-          className="text-gray-500 hover:text-gray-700"
-          title="Settings"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </div>
+    <div className="flex flex-col h-full p-4 bg-gray-50">
+      <h1 className="text-xl font-bold mb-4 text-center">GhostType AI</h1>
 
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         <button
           onClick={openSidebar}
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center justify-center transition-colors"
+          className="flex items-center justify-between px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 mr-2"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 1H6v8l4-2 4 2V6z"
-              clipRule="evenodd"
-            />
-          </svg>
-          Open Sidebar
+          <div className="flex items-center">
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+              />
+            </svg>
+            Open Sidebar
+          </div>
+          <span className="text-xs opacity-75">{isMac ? "⌘+G" : "Alt+G"}</span>
         </button>
 
         <button
           onClick={openMultiModelChat}
-          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-md flex items-center justify-center transition-colors"
+          className="flex items-center justify-between px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 mr-2"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z" />
-            <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z" />
-          </svg>
-          Multi-Model Chat
+          <div className="flex items-center">
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"
+              />
+            </svg>
+            Multi-Model Chat
+          </div>
+          <span className="text-xs opacity-75">{isMac ? "⌘+M" : "Alt+M"}</span>
+        </button>
+
+        <button
+          onClick={openOptions}
+          className="flex items-center justify-between px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors mt-2"
+        >
+          <div className="flex items-center">
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            Settings
+          </div>
         </button>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-gray-200">
-        <p className="text-xs text-gray-500 mb-2">Keyboard shortcuts:</p>
-        <div className="flex justify-between text-xs text-gray-600">
-          <span>Alt + G: Toggle Sidebar</span>
-          <span>Alt + M: Multi-Model Chat</span>
-        </div>
+      <div className="mt-4 text-xs text-gray-500">
+        <p className="text-center">Keyboard shortcuts:</p>
+        <p className="text-center">{isMac ? "⌘+G" : "Alt+G"}: Toggle Sidebar</p>
+        <p className="text-center">
+          {isMac ? "⌘+M" : "Alt+M"}: Multi-Model Chat
+        </p>
       </div>
     </div>
   );

@@ -56,6 +56,31 @@ export default defineContentScript({
     `;
     document.head.appendChild(style);
 
+    // Add CSS to handle content shifting
+    function addGlobalStyles() {
+      const styleElement = document.createElement("style");
+      styleElement.id = "ghosttype-global-styles";
+      styleElement.textContent = `
+        body.ghosttype-sidebar-open {
+          transition: margin-right 0.3s ease;
+        }
+        
+        @media (max-width: 768px) {
+          body.ghosttype-sidebar-open {
+            margin-right: 0 !important;
+          }
+          
+          #ghosttype-sidebar-container {
+            width: 100% !important;
+          }
+        }
+      `;
+      document.head.appendChild(styleElement);
+    }
+
+    // Call this function early in the main function
+    addGlobalStyles();
+
     // Selectors for editable elements
     const editableSelectors = [
       'input[type="text"]',
@@ -133,6 +158,10 @@ export default defineContentScript({
     let unmountMultiModelChat: (() => void) | null = null;
     let isMultiModelChatOpen = false;
 
+    // Track original content state
+    let originalContentMargin = null;
+    let originalWindowWidth = null;
+
     // Function to toggle sidebar
     function toggleSidebar() {
       console.log("toggleSidebar called in content script");
@@ -151,16 +180,19 @@ export default defineContentScript({
           );
           if (container) {
             console.log("Removing sidebar container");
-            if (typeof unmountSidebar === "function") {
-              unmountSidebar(container);
+
+            // Restore original content margins
+            if (originalContentMargin !== null) {
+              document.body.style.marginRight = originalContentMargin;
+              originalContentMargin = null;
             }
-            document.body.removeChild(container);
-            console.log("Sidebar container removed from body");
+
+            unmountSidebar(container);
+            container.remove();
           } else {
             console.warn("Sidebar container not found when trying to close");
           }
           isSidebarOpen = false;
-          unmountSidebar = null;
         } else {
           console.log("Opening sidebar");
 
@@ -187,6 +219,11 @@ export default defineContentScript({
             unmountSidebar = null;
           }
 
+          // Save original content margin
+          originalContentMargin = window.getComputedStyle(
+            document.body
+          ).marginRight;
+
           // Create a new container for the sidebar
           const container = document.createElement("div");
           container.id = "ghosttype-sidebar-container";
@@ -209,23 +246,51 @@ export default defineContentScript({
           container.style.visibility = "visible";
           container.style.opacity = "1";
 
-          // Append to body
+          // Adjust the page content instead of resizing the window
+          // This approach works better across different websites
+          document.body.style.marginRight = "320px";
+
           document.body.appendChild(container);
           console.log(
             "Sidebar container created and appended to body:",
             container
           );
 
-          // Update context when opening sidebar
+          // Get current page context for better awareness
           getPageContext()
             .then((context) => {
               console.log(
                 "Got page context:",
                 context.substring(0, 100) + "..."
               );
+
+              // Analyze the current page to make sidebar more context-aware
+              const pageTitle = document.title;
+              const activeElement = document.activeElement;
+              const selection = window.getSelection()?.toString() || "";
+              const url = window.location.href;
+
+              // Enhanced context with more details about the current page state
+              const enhancedContext = {
+                text: context,
+                title: pageTitle,
+                url: url,
+                selection: selection,
+                activeElementType: activeElement ? activeElement.tagName : null,
+                activeElementId: activeElement ? activeElement.id : null,
+                activeElementClass: activeElement
+                  ? activeElement.className
+                  : null,
+                isEditing:
+                  activeElement &&
+                  (activeElement.tagName === "INPUT" ||
+                    activeElement.tagName === "TEXTAREA" ||
+                    activeElement.getAttribute("contenteditable") === "true"),
+              };
+
               chrome.runtime.sendMessage({
                 type: "UPDATE_CONTEXT",
-                context,
+                context: JSON.stringify(enhancedContext),
               });
             })
             .catch((error) => {
@@ -233,7 +298,9 @@ export default defineContentScript({
             });
 
           try {
-            console.log("Mounting sidebar component");
+            console.log(
+              "Mounting sidebar component with enhanced context awareness"
+            );
             unmountSidebar = mountSidebar(container, () => {
               toggleSidebar();
             });
@@ -253,12 +320,22 @@ export default defineContentScript({
             if (container.parentNode) {
               container.parentNode.removeChild(container);
             }
+            // Restore original content margin if sidebar mounting fails
+            if (originalContentMargin !== null) {
+              document.body.style.marginRight = originalContentMargin;
+              originalContentMargin = null;
+            }
             isSidebarOpen = false;
             unmountSidebar = null;
           }
         }
       } catch (error) {
         console.error("Error in toggleSidebar:", error);
+        // Restore original content margin in case of error
+        if (originalContentMargin !== null) {
+          document.body.style.marginRight = originalContentMargin;
+          originalContentMargin = null;
+        }
         isSidebarOpen = false;
         unmountSidebar = null;
       }
@@ -363,14 +440,34 @@ export default defineContentScript({
       return true; // Required for async response
     });
 
-    // Add keyboard shortcut for sidebar (Alt+G)
-    document.addEventListener("keydown", (e) => {
-      if (e.altKey && e.key === "g") {
+    // Listen for keyboard shortcuts
+    document.addEventListener("keydown", (event) => {
+      // Mac-specific shortcut: Command+Space+G
+      if (
+        (navigator.platform.includes("Mac") &&
+          event.metaKey &&
+          event.code === "KeyG") ||
+        (!navigator.platform.includes("Mac") &&
+          event.altKey &&
+          event.code === "KeyG")
+      ) {
+        console.log("Keyboard shortcut detected for sidebar");
         toggleSidebar();
+        event.preventDefault();
       }
 
-      if (e.altKey && e.key === "m") {
+      // Mac-specific shortcut: Command+Space+M for multi-model chat
+      if (
+        (navigator.platform.includes("Mac") &&
+          event.metaKey &&
+          event.code === "KeyM") ||
+        (!navigator.platform.includes("Mac") &&
+          event.altKey &&
+          event.code === "KeyM")
+      ) {
+        console.log("Keyboard shortcut detected for multi-model chat");
         toggleMultiModelChat();
+        event.preventDefault();
       }
     });
 

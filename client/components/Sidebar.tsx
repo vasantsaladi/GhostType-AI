@@ -15,29 +15,75 @@ export const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [pageContext, setPageContext] = useState<string>("");
+  const [pageContext, setPageContext] = useState("");
+  const [enhancedContext, setEnhancedContext] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Get page context when sidebar is opened
     const fetchPageContext = async () => {
-      setIsLoading(true);
       try {
-        const context = await getPageContext();
-        setPageContext(context);
+        // Get the raw context
+        const context = await chrome.runtime.sendMessage({
+          type: "GET_CONTEXT",
+        });
 
-        // Add initial assistant message with context
+        // Try to parse as JSON for enhanced context
+        try {
+          const parsedContext = JSON.parse(context);
+          setEnhancedContext(parsedContext);
+          setPageContext(parsedContext.text || context);
+
+          // If there's a selection, automatically set it as the input
+          if (
+            parsedContext.selection &&
+            parsedContext.selection.length > 0 &&
+            parsedContext.selection.length < 200
+          ) {
+            setInput(`Help me improve this text: "${parsedContext.selection}"`);
+          }
+
+          // Add a welcome message based on the context
+          let welcomeMessage =
+            "Hello! I'm your GhostType AI assistant. How can I help you with your writing?";
+
+          if (parsedContext.isEditing) {
+            welcomeMessage =
+              "I see you're editing content. Would you like help with writing, editing, or formatting?";
+          } else if (parsedContext.url.includes("mail.google.com")) {
+            welcomeMessage =
+              "I see you're in Gmail. Need help drafting an email or responding to a message?";
+          } else if (parsedContext.url.includes("docs.google.com")) {
+            welcomeMessage =
+              "I notice you're working in Google Docs. Need help with your document?";
+          } else if (parsedContext.selection) {
+            welcomeMessage = `I see you've selected some text. Would you like me to help improve or expand on "${parsedContext.selection.substring(
+              0,
+              50
+            )}${parsedContext.selection.length > 50 ? "..." : ""}"?`;
+          }
+
+          setMessages([{ role: "assistant", content: welcomeMessage }]);
+        } catch (e) {
+          // If parsing fails, use the raw context
+          setPageContext(context);
+          setMessages([
+            {
+              role: "assistant",
+              content:
+                "Hello! I'm your GhostType AI assistant. How can I help you with your writing?",
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Error fetching context:", error);
+        setPageContext("");
         setMessages([
           {
             role: "assistant",
             content:
-              "Hello! I'm your GhostType AI assistant. I've analyzed this page and I'm ready to help you with your writing.",
+              "Hello! I'm your GhostType AI assistant. I couldn't access the page context, but I'm still here to help with your writing needs.",
           },
         ]);
-      } catch (error) {
-        console.error("Error fetching page context:", error);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -45,40 +91,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   }, []);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
-    // Add user message
-    const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const userMessage = input.trim();
     setInput("");
     setIsLoading(true);
 
+    // Add user message to chat
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+
     try {
-      // Send message to background script
+      // Include enhanced context in the request if available
+      const contextToSend = enhancedContext
+        ? JSON.stringify(enhancedContext)
+        : pageContext;
+
       const response = await chrome.runtime.sendMessage({
         type: "CHAT_MESSAGE",
-        text: input,
-        pageContext,
+        text: userMessage,
+        pageContext: contextToSend,
       });
 
-      // Add assistant response
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: response.text || "Sorry, I couldn't process your request.",
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      if (response.error) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Error: ${response.error}` },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: response.text },
+        ]);
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, there was an error processing your request.",
+          content:
+            "Sorry, I encountered an error processing your request. Please try again.",
         },
       ]);
     } finally {
@@ -239,6 +295,9 @@ export const mountSidebar = (container: HTMLElement, onClose: () => void) => {
     container.style.visibility = "visible";
     container.style.opacity = "1";
 
+    // Add a class to the body to indicate sidebar is open
+    document.body.classList.add("ghosttype-sidebar-open");
+
     // Create root element
     const root = document.createElement("div");
     root.style.width = "100%";
@@ -247,13 +306,12 @@ export const mountSidebar = (container: HTMLElement, onClose: () => void) => {
     root.style.visibility = "visible";
     console.log("Created root element for sidebar:", root);
 
-    // Append root to container
     container.appendChild(root);
     console.log("Appended root to container");
 
     console.log("Creating React root for sidebar");
     const reactRoot = createRoot(root);
-    console.log("React root created, rendering Sidebar component");
+    console.log("Rendering Sidebar component");
     reactRoot.render(<Sidebar onClose={onClose} />);
     console.log("Sidebar component rendered");
 
@@ -263,6 +321,9 @@ export const mountSidebar = (container: HTMLElement, onClose: () => void) => {
       try {
         reactRoot.unmount();
         console.log("React root unmounted");
+
+        // Remove the class from body
+        document.body.classList.remove("ghosttype-sidebar-open");
 
         if (unmountContainer && unmountContainer.contains(root)) {
           unmountContainer.removeChild(root);
@@ -276,6 +337,8 @@ export const mountSidebar = (container: HTMLElement, onClose: () => void) => {
     console.error("Error mounting sidebar:", error);
     return () => {
       console.log("Calling empty unmount function due to previous error");
+      // Remove the class from body even in case of error
+      document.body.classList.remove("ghosttype-sidebar-open");
     };
   }
 };
